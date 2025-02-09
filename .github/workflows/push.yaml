@@ -1,0 +1,44 @@
+name: Deploy Repo inside root directory to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main  # Change this to your branch name if needed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploying to DigitalOcean Droplet via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            cd /var/www/
+
+            # Clone only if repo doesn't exist
+            if [ ! -d "repo" ]; then
+              git clone --filter=blob:none --no-checkout ${{ secrets.REPO_URL }} repo
+            fi
+
+            cd repo
+            git sparse-checkout init --cone
+            git sparse-checkout set logs_streaming
+            git checkout main
+            git pull origin main  # Pull latest changes
+
+            cd logs_streaming
+            npm install --production  # Install dependencies
+
+            # Restart PM2 app if running, otherwise start
+            pm2 describe logs_streaming > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+              pm2 restart logs_streaming
+            else
+              pm2 start dist/index.js --name logs_streaming
+            fi
+
+            pm2 save  # Save process list to restart on reboot
