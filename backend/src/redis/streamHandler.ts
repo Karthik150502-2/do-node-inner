@@ -1,24 +1,21 @@
 import { Response } from "express";
 import Redis from "ioredis";
-import { randomUUID, UUID } from "crypto";
-
+import { nanoid } from "nanoid";
 
 export class StreamHandler {
 
     private redis: Redis;
     private responseObject: Response;
     private streamName: string;
-    private bgJobId: string
     private isStreamEnded: boolean = false;
-    private lastMsgId: string = "0";
-    private id: UUID = randomUUID();
+    private lastMsgId: string = "0"; // Initially starting from the very first log.
+    private id: string = nanoid(10); // Unique identifier for each stream
 
 
-    constructor(redis: Redis, res: Response, bgJobId: string) {
+    constructor(redis: Redis, res: Response, { jobId, shopId }: { jobId: string, shopId: string }) {
         this.redis = redis;
         this.responseObject = res;
-        this.bgJobId = bgJobId
-        this.streamName = `logs:${this.bgJobId}`;
+        this.streamName = `logs:${jobId}-${shopId}`;
         this.subscribeToStream()
     }
 
